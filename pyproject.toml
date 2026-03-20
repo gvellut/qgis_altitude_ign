@@ -1,7 +1,15 @@
 [project]
 name = "qgis-altitude-ign"
 version = "0.1.0"
-description = "Add your description here"
+description = "QGIS plugin to click on the map and retrieve altitude from the IGN elevation service"
 readme = "README.md"
+license = { text = "GPL-3.0-or-later" }
 requires-python = ">=3.11"
 dependencies = []
+
+[dependency-groups]
+dev = ["pytest>=9.0.2"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]

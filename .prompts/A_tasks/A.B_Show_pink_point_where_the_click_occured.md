@@ -1,0 +1,1 @@
+Show pink point where the click occured. Make the point disappear when the tool is made inactive or when the panel is closed

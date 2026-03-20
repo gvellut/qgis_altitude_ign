@@ -1,0 +1,12 @@
+[general]
+name=Altitude IGN
+description=Click on the map and retrieve the altitude from the IGN elevation service
+version=0.1.0
+qgisMinimumVersion=3.22
+author=Guilhem
+email=
+about=Altitude IGN provides a simple click tool to fetch the elevation of a point from the IGN API.
+repository=
+tracker=
+category=Map Tools
+icon=icons/altitude_ign.svg

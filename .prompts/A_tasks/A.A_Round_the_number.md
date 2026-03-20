@@ -1,0 +1,1 @@
+In the result text field : round the number to closest integer
