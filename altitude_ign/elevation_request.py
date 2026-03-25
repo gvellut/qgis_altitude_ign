@@ -1,14 +1,15 @@
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
+import json
 from urllib.parse import urlencode
 
 BASE_ELEVATION_URL = (
     "https://data.geopf.fr/altimetrie/1.0/calcul/alti/rest/elevation.json"
 )
 ELEVATION_RESOURCE = "ign_rge_alti_wld"
+REQUEST_TIMEOUT_MS = 2000
 
 
 class ElevationRequestError(RuntimeError):
@@ -42,11 +43,26 @@ def build_elevation_url(lon: float, lat: float) -> str:
     return f"{BASE_ELEVATION_URL}?{query}"
 
 
+def build_elevation_network_request(
+    lon: float,
+    lat: float,
+):
+    from qgis.PyQt.QtCore import QUrl
+    from qgis.PyQt.QtNetwork import QNetworkRequest
+
+    request = QNetworkRequest(QUrl(build_elevation_url(lon, lat)))
+    request.setRawHeader(b"Accept", b"application/json")
+    request.setTransferTimeout(REQUEST_TIMEOUT_MS)
+    return request
+
+
 def parse_elevation_payload(payload: bytes | str) -> str:
     try:
         decoded_payload = json.loads(payload)
     except Exception as exc:
-        raise ElevationRequestError("Invalid JSON response from the elevation service.") from exc
+        raise ElevationRequestError(
+            "Invalid JSON response from the elevation service."
+        ) from exc
 
     if not isinstance(decoded_payload, dict):
         raise ElevationRequestError("Unexpected response from the elevation service.")

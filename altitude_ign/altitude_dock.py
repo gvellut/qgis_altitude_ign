@@ -12,9 +12,9 @@ from qgis.core import (
     QgsWkbTypes,
 )
 from qgis.gui import QgsDockWidget, QgsRubberBand
-from qgis.PyQt.QtCore import Qt, QUrl
+from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtGui import QColor
-from qgis.PyQt.QtNetwork import QNetworkReply, QNetworkRequest
+from qgis.PyQt.QtNetwork import QNetworkReply
 from qgis.PyQt.QtWidgets import (
     QApplication,
     QHBoxLayout,
@@ -28,7 +28,7 @@ from qgis.PyQt.QtWidgets import (
 from .elevation_request import (
     ElevationRequestError,
     RequestTracker,
-    build_elevation_url,
+    build_elevation_network_request,
     parse_elevation_payload,
 )
 
@@ -89,8 +89,7 @@ class AltitudeIgnDock(QgsDockWidget):
         self.setObjectName("AltitudeIgnDock")
         self.setWindowTitle(title)
         self.setAllowedAreas(
-            Qt.DockWidgetArea.LeftDockWidgetArea
-            | Qt.DockWidgetArea.RightDockWidgetArea
+            Qt.DockWidgetArea.LeftDockWidgetArea | Qt.DockWidgetArea.RightDockWidgetArea
         )
 
         self._request_tracker = RequestTracker()
@@ -134,10 +133,9 @@ class AltitudeIgnDock(QgsDockWidget):
         self.clear_value()
         self._clear_pending_reply()
 
-        request = QNetworkRequest(QUrl(build_elevation_url(lon, lat)))
-        request.setRawHeader(b"Accept", b"application/json")
-
-        reply = QgsNetworkAccessManager.instance().get(request)
+        reply = QgsNetworkAccessManager.instance().get(
+            build_elevation_network_request(lon, lat)
+        )
         self._pending_reply = reply
         reply.finished.connect(partial(self._on_reply_finished, request_id, reply))
 

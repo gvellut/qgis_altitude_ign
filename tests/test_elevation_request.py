@@ -18,7 +18,9 @@ class TestElevationRequest(unittest.TestCase):
         url = build_elevation_url(1.4, 43.54)
         parsed = urlparse(url)
 
-        self.assertEqual(f"{parsed.scheme}://{parsed.netloc}{parsed.path}", BASE_ELEVATION_URL)
+        self.assertEqual(
+            f"{parsed.scheme}://{parsed.netloc}{parsed.path}", BASE_ELEVATION_URL
+        )
         self.assertEqual(
             parse_qs(parsed.query),
             {
