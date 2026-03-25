@@ -7,6 +7,7 @@ from qgis.core import (
     QgsApplication,
     QgsCoordinateReferenceSystem,
     QgsCoordinateTransform,
+    QgsMessageLog,
     QgsNetworkAccessManager,
     QgsProject,
     QgsWkbTypes,
@@ -14,7 +15,7 @@ from qgis.core import (
 from qgis.gui import QgsDockWidget, QgsRubberBand
 from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtGui import QColor
-from qgis.PyQt.QtNetwork import QNetworkReply
+from qgis.PyQt.QtNetwork import QNetworkReply, QNetworkRequest
 from qgis.PyQt.QtWidgets import (
     QApplication,
     QHBoxLayout,
@@ -26,6 +27,7 @@ from qgis.PyQt.QtWidgets import (
 )
 
 from .elevation_request import (
+    REQUEST_TIMEOUT_MS,
     ElevationRequestError,
     RequestTracker,
     build_elevation_network_request,
@@ -33,6 +35,7 @@ from .elevation_request import (
 )
 
 PLUGIN_TITLE = "Altitude IGN"
+MAX_LOG_PAYLOAD_PREVIEW_LENGTH = 200
 
 if hasattr(QgsWkbTypes, "PointGeometry"):
     POINT_GEOM = QgsWkbTypes.PointGeometry
@@ -106,7 +109,7 @@ class AltitudeIgnDock(QgsDockWidget):
 
     def cleanup(self) -> None:
         self._request_tracker.invalidate()
-        self._clear_pending_reply()
+        self._clear_pending_reply(reason="plugin cleanup")
         self._clicked_point_marker.cleanup()
 
         main_window = self.iface.mainWindow()
@@ -131,17 +134,27 @@ class AltitudeIgnDock(QgsDockWidget):
         self.ensure_visible()
         request_id = self._request_tracker.start_new_request()
         self.clear_value()
-        self._clear_pending_reply()
-
-        reply = QgsNetworkAccessManager.instance().get(
-            build_elevation_network_request(lon, lat)
+        self._clear_pending_reply(
+            reason=f"starting elevation request #{request_id}",
         )
+
+        request = build_elevation_network_request(lon, lat)
+        self._log_message(
+            (
+                f"Starting elevation request #{request_id} for "
+                f"lon={lon:.6f}, lat={lat:.6f}, timeout={REQUEST_TIMEOUT_MS} ms, "
+                f"url={request.url().toString()}"
+            ),
+            Qgis.Info,
+        )
+
+        reply = QgsNetworkAccessManager.instance().get(request)
         self._pending_reply = reply
         reply.finished.connect(partial(self._on_reply_finished, request_id, reply))
 
     def handle_tool_deactivated(self) -> None:
         self._request_tracker.invalidate()
-        self._clear_pending_reply()
+        self._clear_pending_reply(reason="tool deactivation")
         self.clear_clicked_point()
         self.clear_value()
         self.hide()
@@ -185,16 +198,57 @@ class AltitudeIgnDock(QgsDockWidget):
 
         try:
             if not self._request_tracker.is_current(request_id):
+                self._log_message(
+                    (
+                        f"Ignoring reply for superseded elevation request "
+                        f"#{request_id} ({self._describe_reply(reply)})"
+                    ),
+                    Qgis.Info,
+                )
                 return
 
+            response_body = bytes(reply.readAll())
             if reply.error() != QNetworkReply.NetworkError.NoError:
                 if reply.error() == QNetworkReply.NetworkError.OperationCanceledError:
+                    self._log_message(
+                        (
+                            f"Elevation request #{request_id} was canceled "
+                            f"({self._describe_reply(reply)})"
+                        ),
+                        Qgis.Info,
+                    )
                     return
+                self._log_message(
+                    (
+                        f"Elevation request #{request_id} failed "
+                        f"({self._describe_reply(reply)}, "
+                        f"payload={self._payload_preview(response_body)})"
+                    ),
+                    Qgis.Warning,
+                )
                 raise ElevationRequestError(
                     reply.errorString() or "Network error while requesting elevation."
                 )
 
-            value = parse_elevation_payload(bytes(reply.readAll()))
+            self._log_message(
+                (
+                    f"Received reply for elevation request #{request_id} "
+                    f"({self._describe_reply(reply)}, bytes={len(response_body)})"
+                ),
+                Qgis.Info,
+            )
+            try:
+                value = parse_elevation_payload(response_body)
+            except ElevationRequestError:
+                self._log_message(
+                    (
+                        f"Elevation request #{request_id} returned an invalid payload "
+                        f"({self._describe_reply(reply)}, "
+                        f"payload={self._payload_preview(response_body)})"
+                    ),
+                    Qgis.Warning,
+                )
+                raise
         except ElevationRequestError as exc:
             self.clear_value()
             self.iface.messageBar().pushMessage(
@@ -204,20 +258,56 @@ class AltitudeIgnDock(QgsDockWidget):
                 duration=5,
             )
         else:
+            self._log_message(
+                f"Parsed altitude {value} m for elevation request #{request_id}",
+                Qgis.Info,
+            )
             self.value_field.setText(value)
             self.copy_button.setEnabled(True)
         finally:
             reply.deleteLater()
 
-    def _clear_pending_reply(self) -> None:
+    def _clear_pending_reply(self, reason: str) -> None:
         if self._pending_reply is None:
             return
 
         reply = self._pending_reply
         self._pending_reply = None
+        self._log_message(
+            f"Canceling pending elevation request ({reason}; "
+            f"{self._describe_reply(reply)})",
+            Qgis.Info,
+        )
         reply.abort()
         reply.deleteLater()
 
     def _on_visibility_changed(self, visible: bool) -> None:
         if not visible:
             self.clear_clicked_point()
+
+    def _describe_reply(self, reply: QNetworkReply) -> str:
+        parts = [f"url={reply.url().toString()}"]
+        http_status = reply.attribute(QNetworkRequest.Attribute.HttpStatusCodeAttribute)
+        if http_status is not None:
+            parts.append(f"http_status={http_status}")
+        if reply.error() != QNetworkReply.NetworkError.NoError:
+            parts.append(f"network_error={reply.error()}")
+            if reply.errorString():
+                parts.append(f"error={reply.errorString()}")
+        return ", ".join(parts)
+
+    def _payload_preview(self, payload: bytes) -> str:
+        if not payload:
+            return "<empty>"
+
+        preview = payload[:MAX_LOG_PAYLOAD_PREVIEW_LENGTH].decode(
+            "utf-8",
+            errors="replace",
+        )
+        preview = " ".join(preview.split())
+        if len(payload) > MAX_LOG_PAYLOAD_PREVIEW_LENGTH:
+            return f"{preview}..."
+        return preview
+
+    def _log_message(self, message: str, level: Qgis.MessageLevel) -> None:
+        QgsMessageLog.logMessage(message, PLUGIN_TITLE, level)
