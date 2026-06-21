@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from configparser import ConfigParser
+from pathlib import Path
 import unittest
 from urllib.parse import parse_qs, urlparse
 
@@ -12,6 +14,8 @@ from altitude_ign.elevation_request import (
     parse_elevation_payload,
 )
 
+PLUGIN_METADATA = Path(__file__).resolve().parents[1] / "altitude_ign" / "metadata.txt"
+
 
 class TestElevationRequest(unittest.TestCase):
     def test_build_elevation_url(self) -> None:
@@ -19,7 +23,8 @@ class TestElevationRequest(unittest.TestCase):
         parsed = urlparse(url)
 
         self.assertEqual(
-            f"{parsed.scheme}://{parsed.netloc}{parsed.path}", BASE_ELEVATION_URL
+            f"{parsed.scheme}://{parsed.netloc}{parsed.path}",
+            BASE_ELEVATION_URL,
         )
         self.assertEqual(
             parse_qs(parsed.query),
@@ -81,6 +86,14 @@ class TestElevationRequest(unittest.TestCase):
         tracker.invalidate()
 
         self.assertFalse(tracker.is_current(second_request_id))
+
+    def test_metadata_targets_qgis_4_only(self) -> None:
+        metadata = ConfigParser()
+        metadata.read(PLUGIN_METADATA)
+
+        self.assertEqual(metadata["general"]["qgisMinimumVersion"], "4.0")
+        self.assertEqual(metadata["general"]["qgisMaximumVersion"], "4.99")
+        self.assertNotIn("supportsQt6", metadata["general"])
 
 
 if __name__ == "__main__":

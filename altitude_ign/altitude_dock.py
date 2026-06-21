@@ -10,7 +10,6 @@ from qgis.core import (
     QgsMessageLog,
     QgsNetworkAccessManager,
     QgsProject,
-    QgsWkbTypes,
 )
 from qgis.gui import QgsDockWidget, QgsRubberBand
 from qgis.PyQt.QtCore import Qt
@@ -37,10 +36,7 @@ from .elevation_request import (
 PLUGIN_TITLE = "Altitude IGN"
 MAX_LOG_PAYLOAD_PREVIEW_LENGTH = 200
 
-if hasattr(QgsWkbTypes, "PointGeometry"):
-    POINT_GEOM = QgsWkbTypes.PointGeometry
-else:
-    POINT_GEOM = QgsWkbTypes.GeometryType.PointGeometry
+POINT_GEOMETRY = Qgis.GeometryType.Point
 
 
 class ClickedPointMarker:
@@ -52,7 +48,7 @@ class ClickedPointMarker:
             self.canvas.mapSettings().destinationCrs(),
             QgsProject.instance(),
         )
-        self._point_band = QgsRubberBand(self.canvas, POINT_GEOM)
+        self._point_band = QgsRubberBand(self.canvas, POINT_GEOMETRY)
         self._point_band.setColor(QColor("magenta"))
         self._point_band.setIconSize(12)
         self._point_band.setWidth(3)
@@ -61,7 +57,7 @@ class ClickedPointMarker:
         self.clear()
 
     def clear(self) -> None:
-        self._point_band.reset(POINT_GEOM)
+        self._point_band.reset(POINT_GEOMETRY)
 
     def show_point(self, point_wgs84) -> None:
         self.clear()
@@ -254,7 +250,7 @@ class AltitudeIgnDock(QgsDockWidget):
             self.iface.messageBar().pushMessage(
                 PLUGIN_TITLE,
                 str(exc),
-                level=Qgis.Warning,
+                level=Qgis.MessageLevel.Warning,
                 duration=5,
             )
         else:

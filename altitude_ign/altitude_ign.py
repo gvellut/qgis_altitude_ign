@@ -4,8 +4,7 @@ import os
 from pathlib import Path
 
 from qgis.PyQt.QtCore import QCoreApplication
-from qgis.PyQt.QtGui import QIcon
-from qgis.PyQt.QtWidgets import QAction
+from qgis.PyQt.QtGui import QAction, QIcon
 
 from .altitude_dock import AltitudeIgnDock
 from .altitude_ign_tool import AltitudeIgnMapTool

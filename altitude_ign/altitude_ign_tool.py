@@ -44,7 +44,7 @@ class AltitudeIgnMapTool(QgsMapTool):
             self.iface.messageBar().pushMessage(
                 PLUGIN_TITLE,
                 str(exc),
-                level=Qgis.Warning,
+                level=Qgis.MessageLevel.Warning,
                 duration=5,
             )
             return
@@ -55,10 +55,10 @@ class AltitudeIgnMapTool(QgsMapTool):
     def _event_point_to_wgs84(self, event: QgsMapMouseEvent) -> QgsPointXY:
         source_crs = self.canvas.mapSettings().destinationCrs()
         destination_crs = QgsCoordinateReferenceSystem.fromEpsgId(4326)
-        point = self.canvas.getCoordinateTransform().toMapCoordinates(event.pos())
+        point = event.originalMapPoint()
         transform = QgsCoordinateTransform(
             source_crs,
             destination_crs,
             QgsProject.instance(),
         )
-        return transform.transform(QgsPointXY(point.x(), point.y()))
+        return transform.transform(QgsPointXY(point))

@@ -14,7 +14,7 @@ The web service only covers France and surrounding areas (like Geneva).
 
 ## Requirements
 
-- QGIS 3.22+
+- QGIS 4.0+
 - Python 3.11
 - Network access to `https://data.geopf.fr/`
 
@@ -49,10 +49,10 @@ Add these paths to get PyQGIS autocomplete:
 ```json
 {
     "python.analysis.extraPaths": [
-        "/Applications/QGIS.app/Contents/Resources/python3.11/site-packages"
+        "/Applications/QGIS.app/Contents/Resources/python/site-packages"
     ],
     "python.autoComplete.extraPaths": [
-        "/Applications/QGIS.app/Contents/Resources/python3.11/site-packages"
+        "/Applications/QGIS.app/Contents/Resources/python/site-packages"
     ]
 }
 ```
